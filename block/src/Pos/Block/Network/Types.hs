@@ -5,6 +5,10 @@ module Pos.Block.Network.Types
        , MsgGetBlocks (..)
        , MsgHeaders (..)
        , MsgBlock (..)
+       , MsgStream (..)
+       , MsgStreamStart (..)
+       , MsgStreamUpdate (..)
+       , MsgStreamBlock (..)
        , mlGenesisBlockHeader
        , mlMainBlockHeader
        , mlBlockHeader
@@ -108,3 +112,25 @@ mlMsgBlock = fmap MsgBlock . mlBlock
 -- MsgNoHeaders variant.
 mlMsgHeaders :: BlockVersionData -> Int -> Limit MsgHeaders
 mlMsgHeaders bvd maxListSize = MsgHeaders . NewestFirst <$> vectorOfNE maxListSize (mlBlockHeader bvd)
+
+data MsgStream
+    = MsgStart MsgStreamStart
+    | MsgUpdate MsgStreamUpdate
+    deriving (Eq, Show, Generic)
+
+data MsgStreamStart = MsgStreamStart
+    { mssFrom   :: ![HeaderHash]
+    , mssTo     :: !HeaderHash
+    , mssWindow :: !Word32
+    } deriving (Generic, Show, Eq)
+
+data MsgStreamUpdate = MsgStreamUpdate
+    { msuWindow :: !Word32
+    } deriving (Generic, Show, Eq)
+
+data MsgStreamBlock
+    = MsgStreamBlock Block
+    | MsgStreamNoBlock Text
+    | MsgStreamEnd
+    deriving (Eq, Show, Generic)
+

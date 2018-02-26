@@ -11,17 +11,18 @@ import           Test.QuickCheck (Arbitrary (..), listOf1, oneof)
 import           Test.QuickCheck.Arbitrary.Generic (genericArbitrary, genericShrink)
 
 import           Pos.Arbitrary.Core ()
-import           Pos.Arbitrary.Crypto ()
 import           Pos.Arbitrary.Slotting ()
 import           Pos.Binary.Update ()
 import           Pos.Core.Configuration (HasConfiguration)
 import           Pos.Core.Update (BlockVersionModifier, SystemTag (..), UpdateData (..),
                                   UpdatePayload (..), UpdateProposal (..),
-                                  UpdateProposalToSign (..), UpdateVote (..),
-                                  mkUpdateProposalWSign, mkUpdateVote)
+                                  UpdateProposalToSign (..), UpdateVote (..), mkUpdateProposalWSign,
+                                  mkUpdateVote)
 import           Pos.Crypto (fakeSigner)
 import           Pos.Data.Attributes (mkAttributes)
 import           Pos.Update.Poll.Types (VoteState (..))
+
+import           Test.Pos.Arbitrary.Crypto ()
 
 instance Arbitrary BlockVersionModifier where
     arbitrary = genericArbitrary

@@ -30,7 +30,7 @@
 
 \title{Cardano wallet specification (DRAFT)}
 \author{Duncan Coutts \and Edsko de Vries}
-\date{February 14, 2018}
+\date{February 28, 2018}
 
 \maketitle
 
@@ -53,6 +53,8 @@
      clarified. Next steps updated.
 \item[Draft 6, Feb 12, 2018 (Edsko)] Added section on prefiltering.
 \item[Draft 7, Feb 14, 2018 (Edsko)] Added section on rollbacks.
+\item[Draft 8, Feb 27, 2018 (Edsko)] Fixed definition of prefiltering in the presence
+     of rollbacks, and made the style more consistent with Duncan's.
 \end{description}
 
 \section{Introduction}
@@ -680,91 +682,109 @@ Putting everything back together, and defining $utxo^-$ for symmetry, we get
 \section{Database implementation considerations}
 \label{sec:prefiltering}
 
+\subsection{Motivation}
+
 The $\mathsf{applyBlock} ~ b$ operation is problematic in a setting where it is
 implemented as an operation on the local database of the wallet and those
 operations are stored in a log. The log would contain the full blocks received
 by the wallet, which at current constants of a maximum block of 2 MB and a slot
 length of 20 seconds would mean a worst-case log growth rate of 360 MB/hour.
 
-Let's start by applying Lemmas~\ref{restrictdom_union}
-and~\ref{subtractdom_union} to distribute domain restriction/exclusion over
-union in the definition of $\mathsf{applyBlock}_\sigma$ from
-Section~\ref{sec:applyBlock_incr}:
+\subsection{Derivation}
 
-\begin{equation*}
-\begin{split}
-\mathsf{applyBlock}_\sigma & ~ b ~ (utxo, pending, \sigma) = (utxo^\prime, pending^\prime, \sigma^\prime) \\
-\text{where} \quad \\
-    pending^\prime & = \mathsf{updatePending} ~ b ~ pending \\
-    utxo^+ & = \mathsf{txouts} ~ b \restrictrange \mathsf{TxOut_{ours}} \\
-    utxo^- & = (\mathsf{txins} ~ b \restrictdom utxo) \cup (\mathsf{txins} ~ b \restrictdom utxo^+) \\
-    utxo^\prime & = (\mathsf{txins} ~ b \subtractdom utxo) \cup (\mathsf{txins} ~ b \subtractdom utxo^+) \\
-    \sigma^\prime & = \sigma + \mathsf{balance} ~ utxo^+ - \mathsf{balance} ~ utxo^- \\
-\end{split}
-\end{equation*}
-
-The definition of $utxo^+$ here is perhaps somewhat counter-intuitive: it
-corresponds to the new outputs that the block adds to the UTxO, but includes the
-outputs that are spent within that same block. If we let
-%
-\begin{equation*}
-\mathsf{new} ~ b = \mathsf{txins} ~ b \subtractdom (\mathsf{txouts} ~ b \restrictrange \mathsf{TxOut_{ours}})
-\end{equation*}
-%
-we can change perspective slightly to get
+The goal therefore is to define an auxiliary function to $\mathsf{applyBlock}$
+which only needs the ``relevant'' information from the block.
+Since $\mathsf{applyBlock}_\sigma$ is only defined in terms of inputs and
+outputs of the block, we can easily define the following auxiliary function
+(where we have also expanded the definition of $\mathsf{updatePending}$).
 %
 \begin{equation*}
 \begin{split}
-\mathsf{applyBlock}_\sigma & ~ b ~ (utxo, pending, \sigma) = (utxo^\prime, pending^\prime, \sigma^\prime) \\
+\mathsf{applyBlock'}_\sigma & ~ (\mathit{txins}_b, \mathit{txouts}_b) ~ (\mathit{utxo}, \mathit{pending}, \sigma) = (\mathit{utxo}^\prime, \mathit{pending}^\prime, \sigma^\prime) \\
 \text{where} \quad \\
-    pending^\prime & = \{ tx ~|~ tx \in pending, (inputs, \_) = tx, inputs \cap \mathsf{txins} ~ b = \emptyset \} \\
-    utxo^+ & = \mathsf{new} ~ b \\
-    utxo^- & = \mathsf{txins} ~ b \restrictdom utxo \\
-    utxo^\prime & = (\mathsf{txins} ~ b \subtractdom utxo) \cup utxo^+ \\
+    pending^\prime & = \{ tx ~|~ tx \in pending, (inputs, \_) = tx, inputs \cap \mathit{txins}_b = \emptyset \} \\
+    utxo^+ & = \mathit{txouts}_b \\
+    utxo^- & = \mathit{txins}_b \restrictdom (utxo \cup utxo^+) \\
+    utxo^\prime & = \mathsf{txins}_b \subtractdom (utxo \cup utxo^+) \\
     \sigma^\prime & = \sigma + \mathsf{balance} ~ utxo^+ - \mathsf{balance} ~ utxo^- \\
 \end{split}
 \end{equation*}
 %
-(where we also expanded the definition of $\mathsf{updatePending}$).
-
-Notice that $\mathsf{applyBlock}$ is defined in terms of $\mathsf{txins} ~
-b$ and $\mathsf{new} ~ b$; intuitively, the inputs spent in the block and the
-outputs created in the block. Define $\mathsf{applyBlock}'_\sigma$ such that
+Letting
 %
-\begin{equation*}
-  \mathsf{applyBlock'}_\sigma ~ (\mathsf{txins} ~ b, \mathsf{new} ~ b)
-= \mathsf{applyBlock}_\sigma ~ b
-\end{equation*}
-%
-then, crucially, since
-%
-\begin{align*}
-inputs \cap (\mathsf{txins} ~ b \cap \dom utxo) & = inputs \cap \mathsf{txins} ~ b & \text{(invariant~\ref{txins_in_dom_utxo})} \\
-(\mathsf{txins} ~ b \cap \dom utxo) \subtractdom utxo & = \mathsf{txins} ~ b \subtractdom utxo & \text{(lemma~\ref{subtractdom_dom})} \\
-(\mathsf{txins} ~ b \cap \dom utxo) \restrictdom utxo & = \mathsf{txins} ~ b \restrictdom utxo & \text{(lemma~\ref{restrictdom_dom})} \\
-\end{align*}
-%
-we have that
-%
-\begin{equation*}
-  \mathsf{applyBlock'}_\sigma ~ (\mathsf{txins} ~ b \cap \dom utxo, \mathsf{new} ~ b)
-= \mathsf{applyBlock'}_\sigma ~ (\mathsf{txins} ~ b, \mathsf{new} ~ b)
-\end{equation*}
-%
-and so we can now redefine
-%
-\begin{equation*}
-  \mathsf{applyBlock}_\sigma ~ b
-= \mathsf{applyBlock'}_\sigma ~ (\mathsf{txins} ~ b \cap \dom utxo, \mathsf{new} ~ b)
-\end{equation*}
-%
-What we gained is that the argument to the operation now only contains
-information that is relevant to our UTxO, much reducing the size of the database
-log. Moreover, we can compute this information in
 \begin{math}
-\mathsf{join} ~ |\mathsf{txins} ~ b| ~ |utxo|
+\mathit{utxo}^+ = \mathsf{txouts} ~ b \restrictrange \mathsf{TxOut_{ours}}
 \end{math}
-time, so we haven't inadvertedly made things more expensive.
+%
+we trivially we have that
+%
+\begin{equation}
+  \mathsf{applyBlock}_\sigma ~ b
+= \mathsf{applyBlock}'_\sigma ~ (\mathsf{txins} ~ b, \mathit{utxo}^+)
+\end{equation}
+%
+but we haven't gained much yet because although we only pass in ``our'' outputs,
+we still pass in \emph{all} inputs of the block. However, we also have that
+%
+\begin{equation}
+  \mathsf{applyBlock}_\sigma ~ b
+= \mathsf{applyBlock}'_\sigma ~ \Big( \mathsf{txins} ~ b \cap \dom (\mathit{utxo} \cup \mathit{utxo}^+), \mathit{utxo}^+ \Bigr)
+\end{equation}
+%
+This reduced set of inputs is sufficient for the definitions of
+$\mathit{utxo}^-$ and $\mathit{utxo}^\prime$, since by
+Lemma~\ref{restrictdom_dom}
+%
+\begin{equation*}
+  \Bigl( \mathsf{txins} ~ b \cap \dom (\mathit{utxo} \cup \mathit{utxo}^+) \Bigr) \restrictdom (utxo \cup \mathit{utxo}^+) \\
+= \mathsf{txins} ~ b \restrictdom (utxo \cup \mathit{utxo}^+)
+\end{equation*}
+%
+and by Lemma~\ref{subtractdom_dom}
+%
+\begin{equation*}
+  \Bigl( \mathsf{txins} ~ b \cap \dom (\mathit{utxo} \cup \mathit{utxo}^+) \Bigr) \subtractdom (utxo \cup \mathit{utxo}^+) \\
+= \mathsf{txins} ~ b \subtractdom (utxo \cup \mathit{utxo}^+)
+\end{equation*}
+%
+The reasoning why this reduced set of inputs is \emph{also} sufficient for
+the definition of $\mathit{pending}^\prime$ is a bit more subtle:
+%
+\begin{enumerate}
+
+\item A transaction $\mathit{tx} = (\mathit{inputs}, \mathit{outputs})$ needs to
+be removed from $\mathit{pending}$ when one or more of its $\mathit{inputs}$ are
+spent by a transaction $\mathit{tx}'$ in the blockchain (perhaps $\mathit{tx} =
+\mathit{tx}'$, perhaps not).
+
+\item Transaction $\mathit{tx}'$ can only spent an input $\mathit{\mathit{txin}} =
+(\mathit{\mathit{txid}}, ix)$ when the transaction $\mathit{\mathit{txid}}$ that
+the input refers to is also available in the blockchain.
+
+\item Moreover, since $\mathit{tx} \in \mathit{pending}$ we must have that
+$(\mathit{\mathit{txid}}, ix)$ refers to an output $(\mathit{addr}, c)$
+where $\mathit{addr} \in \mathsf{Addr}_\mathsf{ours}$, and hence we must have
+$(\mathit{\mathit{txid}}, ix) \mapsto (\mathit{addr}, c)$ in the
+$\mathit{\mathit{utxo}}$ of the wallet.
+
+\item When we process blocks as (unordered) \emph{sets} of transactions, there is
+one minor complication to this story. In this case, there is one additional
+possibility: transaction $\mathit{\mathit{txid}}$ might be in the same block as
+$\mathit{tx}$; i.e., it is in $\mathit{utxo}^+$ rather than $\mathit{utxo}$.
+
+\end{enumerate}
+
+You might object that if the wallet isn't aware of transaction
+$\mathit{\mathit{txid}}$ yet then $\mathit{tx}$ cannot be in pending, and hence
+it should suffice to look at the $\mathit{utxo}$ only. Indeed, invariant
+\eqref{txins_in_dom_utxo} tells us that this must be so. In the presence of
+rollbacks (Section~\ref{sec:rollback}) this is unfortunately no longer the case,
+but the reasoning above continues to be true.
+
+\todo[inline]{It would be nicer if the above could be made more formal; it's
+tricky because it involves properties of the blockchain.}
+
+\subsection{Consequences}
 
 The downside is that in order to do this prefiltering we need to know the
 current value of our $utxo$, which means we need to do a database read and then
@@ -793,6 +813,7 @@ in the blockchain, and may be beneficial elsewhere also.
 \end{itemize}
 
 \section{Rollback}
+\label{sec:rollback}
 
 The possible presence of forks in the blockchain means that we may occassionally
 have to roll back and ``undo'' calls to $\mathsf{applyBlock}$, reverting to an
@@ -918,10 +939,10 @@ If we wanted to avoid this, we could strenghten the side condition to
 $\mathsf{newPending}$ to say that confirmed transactions can only be used as
 inputs once we are absolutely certain that the blockchain will not roll back so
 far that they become pending again (with the security parameter $k$ set to 2160
-and a slot length of 20 seconds, this currently takes exactly 12 hours). If that
-stronger side condition is acceptable, we can retain invariant
-\eqref{no_dep_trans}, although invariant \eqref{txins_in_dom_utxo} may still be
-violated.
+and a slot length of 20 seconds, this currently takes exactly 12 hours). \emph{If} that
+stronger side condition were acceptable, we could retain invariant
+\eqref{no_dep_trans} (although invariant \eqref{txins_in_dom_utxo} may still be
+violated); but it is probably too restrictive.
 
 \subsection{Available and change}
 
@@ -1017,15 +1038,16 @@ should be something like a log cost for each change}
 
 \subsection{Incremental balance computation and prefiltering}
 
-Neither the incremental balance computation nor the prefiltering in any way make
-use of, or depend on, the $\mathit{pending}$ set. We can therefore translate the
-definition from Section~\ref{sec:prefiltering} in a straight-forward manner. The
-type of the wallet becomes
-
+Neither the derivation of the incremental balance computation nor the derivation
+of prefiltering relied on invariant~\eqref{txins_in_dom_utxo} (although we did
+have to be careful in derivation of prefiltering); this means that their
+definitions translate in a straight-forward manner to this new setting in which
+rollbacks may be present. The type of the wallet becomes
+%
 \begin{equation*}
 \mathsf{Wallet} = [\mathsf{Utxo} \times \mathsf{Pending} \times \mathsf{Coin}]
 \end{equation*}
-
+%
 The definition of $\mathsf{applyBlock}'_\sigma$ then remains pretty much the
 same, except that it stores the old UTxO as a checkpoint:
 
@@ -1035,14 +1057,14 @@ same, except that it stores the old UTxO as a checkpoint:
 & ((utxo^\prime, pending^\prime, \sigma^\prime), (\mathit{utxo}, \mathit{pending}, \sigma) : \mathit{checkpoints}) \\
 \text{where} \quad \\
     pending^\prime & = \{ tx ~|~ tx \in pending, (inputs, \_) = tx, inputs \cap \mathit{txins}_b = \emptyset \} \\
-    utxo^+ & = \mathit{new}_b \\
-    utxo^- & = \mathit{txins}_b \restrictdom utxo \\
-    utxo^\prime & = (\mathit{txins}_b \subtractdom utxo) \cup utxo^+ \\
+    utxo^+ & = \mathit{txouts}_b \\
+    utxo^- & = \mathit{txins}_b \restrictdom (utxo \cup utxo^+) \\
+    utxo^\prime & = \mathsf{txins}_b \subtractdom (utxo \cup utxo^+) \\
     \sigma^\prime & = \sigma + \mathsf{balance} ~ utxo^+ - \mathsf{balance} ~ utxo^- \\
 \end{split}
 \end{equation*}
 
-Rollback now needs to rollback the cached balance along with the UTxO, and the
+Rollback now needs to restore the cached balance along with the UTxO, and the
 invariant that the cached balance matches the balance computed over the UTxO
 now extends to each checkpoint. The lemmas from Section~\ref{sec:rollback_spec}
 should extend to this modified definition without difficulty.

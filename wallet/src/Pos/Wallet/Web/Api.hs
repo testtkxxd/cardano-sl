@@ -484,7 +484,7 @@ data WSettingsApiRecord route = WSettingsApiRecord
     :- "time"
     :> "difference"
     :> Summary "Get local time difference in microseconds."
-    :> WRes Get Integer
+    :> WRes Get (Maybe Integer)
   }
   deriving (Generic)
 

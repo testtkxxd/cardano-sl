@@ -21,6 +21,7 @@ import           Control.Monad.Except (MonadError (throwError))
 import qualified Control.Monad.Reader as Mtl
 import           Mockable (Production, runProduction)
 import           Network.Wai (Application)
+import           Ntp.Client (NtpStatus)
 import           Servant.Server (Handler)
 import           System.Wlog (logInfo)
 
@@ -73,11 +74,12 @@ walletServeWebFull
        , HasCompileInfo
        )
     => Diffusion WalletWebMode
+    -> TVar NtpStatus
     -> Bool                    -- whether to include genesis keys
     -> NetworkAddress          -- ^ IP and Port to listen
     -> Maybe TlsParams
     -> WalletWebMode ()
-walletServeWebFull diffusion debug = walletServeImpl action
+walletServeWebFull diffusion ntpStatus debug = walletServeImpl action
   where
     action :: WalletWebMode Application
     action = do
@@ -86,7 +88,7 @@ walletServeWebFull diffusion debug = walletServeImpl action
 
         wwmc <- walletWebModeContext
         walletApplication $
-            walletServer @WalletWebModeContext @WalletWebMode diffusion (convertHandler wwmc)
+            walletServer @WalletWebModeContext @WalletWebMode diffusion ntpStatus (convertHandler wwmc)
 
 walletWebModeContext :: WalletWebMode WalletWebModeContext
 walletWebModeContext = view (lensOf @WalletWebModeContextTag)

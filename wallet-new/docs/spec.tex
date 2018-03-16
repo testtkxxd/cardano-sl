@@ -31,7 +31,7 @@
 
 \title{Cardano wallet specification (DRAFT)}
 \author{Duncan Coutts \and Edsko de Vries}
-\date{February 28, 2018}
+\date{March 5, 2018}
 
 \maketitle
 
@@ -56,6 +56,9 @@
 \item[Draft 7, Feb 14, 2018 (Edsko)] Added section on rollbacks.
 \item[Draft 8, Feb 27, 2018 (Edsko)] Fixed definition of prefiltering in the presence
      of rollbacks, and made the style more consistent with Duncan's.
+\item[Draft 9, Mar 5, 2018 (Edsko)] First stab at clarifying the computation and
+     presentation of the wallet's balance in the presence of rollbacks.
+\item[Draft 10, Mar 16, 2018 (Duncan)] First sketch of input selection
 \end{description}
 
 \section{Introduction}
@@ -1311,7 +1314,7 @@ transaction being easily identifiable. For example, if a very large input is
 selected and a small amount is sent to one output and the remaining large
 amount to another output then all observers will reasonably conclude that the
 large output is the change address. Tracing transaction graphs with lots of
-easy signs like this makes it much easier to 
+easy signs like this makes it much easier to
 
 Achieving a high rate of transactions in a UTxO style ledger involves having
 multiple unconfirmed transactions in-flight at once. There are hazards with

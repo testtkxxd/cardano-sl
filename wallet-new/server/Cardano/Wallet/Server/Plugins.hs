@@ -31,6 +31,7 @@ import           Network.Wai (Application, Middleware)
 import           Network.Wai.Middleware.Cors (cors, corsMethods, corsRequestHeaders,
                                               simpleCorsResourcePolicy, simpleMethods)
 import           Network.Wai.Middleware.RequestLogger (logStdoutDev)
+import           Ntp.Client (NtpStatus)
 import           Pos.Diffusion.Types (Diffusion (..))
 import           Pos.Wallet.Web (cleanupAcidStatePeriodically)
 import           Pos.Wallet.Web.Pending.Worker (startPendingTxsResubmitter)
@@ -78,8 +79,9 @@ conversation wArgs = (, mempty) $ map (\act -> ActionSpec $ \__diffusion -> act)
 -- | A @Plugin@ to start the wallet backend API.
 legacyWalletBackend :: (HasConfigurations, HasCompileInfo)
                     => WalletBackendParams
+                    -> TVar NtpStatus
                     -> Plugin WalletWebMode
-legacyWalletBackend WalletBackendParams {..} =
+legacyWalletBackend WalletBackendParams {..} ntpStatus =
     first one $ worker walletServerOuts $ \diffusion -> do
       logInfo $ sformat ("Production mode for API: "%build)
         walletProductionApi
@@ -100,7 +102,7 @@ legacyWalletBackend WalletBackendParams {..} =
       ctx <- V0.walletWebModeContext
       let app = upgradeApplicationWS wsConn $
             Servant.serve API.walletAPI $
-              LegacyServer.walletServer (V0.convertHandler ctx) diffusion walletRunMode
+              LegacyServer.walletServer (V0.convertHandler ctx) diffusion ntpStatus walletRunMode
       return $ withMiddleware walletRunMode app
 
 -- | A 'Plugin' to start the wallet REST server

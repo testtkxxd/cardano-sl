@@ -117,10 +117,10 @@ let
       # Generate daedalus-bridge
       mkdir -p $out/bin $out/config
       cd $out
-      ${if buildId == null then "" else "echo ${buildId} > build-id"}
+      ${optionalString (buildId != null) "echo ${buildId} > build-id"}
       echo ${gitrev} > commit-id
 
-      cp ${./log-configs}/daedalus.yaml config/log-config-prod.yaml
+      cp ${./log-configs + "/daedalus.yaml"} config/log-config-prod.yaml
       cp ${./lib}/configuration.yaml config
       cp ${./lib}/*genesis*.json config
       cp ${cardanoPkgs.cardano-sl-tools}/bin/cardano-launcher bin

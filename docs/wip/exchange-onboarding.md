@@ -375,12 +375,12 @@ In addition, and because it is not possible to preview a transaction, one can lo
 
 Run the latest wallet and go to <https://127.0.0.1:8090/docs/v1/index>.
 
-For the v0 API documentation (deprecated), go to <https://127.0.0.1:8090/docs/v1/index>.
+For the v0 API documentation (deprecated), go to <https://127.0.0.1:8090/docs/v0/index>.
 
-This URL can be customized with the `walletListen` attribute in `./custom-wallet-configuration.nix`.
+The domain and port can be customized with the `walletListen` attribute in `./custom-wallet-configuration.nix`.
 
 ## How can I inspect runtime metrics and statistics?
 
 Current metrics and stats are available at <http://127.0.0.1:8000/>.
 
-This URL can be customized with the `ekgListen` attribute in `./custom-wallet-configuration.nix`.
+The domain and port can be customized with the `ekgListen` attribute in `./custom-wallet-configuration.nix`.

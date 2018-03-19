@@ -9,6 +9,8 @@
 \usepackage{parskip}
 \usepackage{todonotes}
 \usepackage{slashed}
+\usepackage{tikz}
+\usepackage{forest}
 
 \newcommand{\powerset}[1]{\mathbb{P}(#1)}
 \newcommand{\order}[1]{\mathcal{O}\left(#1\right)}
@@ -21,6 +23,7 @@
 \newtheorem{proofobligation}{Proof Obligation}
 \newtheorem{lemma}{Lemma}
 \newtheorem{invariant}{Invariant}
+\newtheorem{definition}{Definition}
 
 \floatstyle{boxed}
 \restylefloat{figure}
@@ -59,6 +62,7 @@
 \item[Draft 9, Mar 5, 2018 (Edsko)] First stab at clarifying the computation and
      presentation of the wallet's balance in the presence of rollbacks.
 \item[Draft 10, Mar 16, 2018 (Duncan)] First sketch of input selection
+\item[Draft 11, Mar 19, 2018 (Edsko)] Computation of minimum balance
 \end{description}
 
 \section{Introduction}
@@ -1192,6 +1196,229 @@ Rollback now needs to restore the cached balance along with the UTxO, and the
 invariant that the cached balance matches the balance computed over the UTxO
 now extends to each checkpoint. The lemmas from Section~\ref{sec:rollback_spec}
 should extend to this modified definition without difficulty.
+
+\section{Minimum Balance}
+
+\todo[inline]{Merge this with the rest of the document}
+
+\begin{definition}[Minimum balance]
+The wallet's \emph{minimum balance} is the minimum balance the wallet may have
+in any possible future, assuming the owner of the wallet does not submit any
+new transactions.
+\end{definition}
+
+\todo[inline]{Make this more formal.}
+
+Of course, if the wallet's owner can submit further transactions, then the
+minimum balance of the wallet is simply zero (the owner spends all their
+funds). For somewhat similar reasons, the wallet's \emph{maximum} balance
+is not a particular interesting notion; if we stipulate ``assuming no
+incoming transactions'' then the maximum balance is simply the current balance,
+and if we don't make such a stipulation, then the balance of the wallet is
+unbounded (or bounded by the cryptocurrency's cap).
+
+\subsection{Basic Model}
+
+Given a wallet $(\mathit{utxo}, \mathit{pending})$, the wallet's minimum balance
+is given by
+
+\begin{align*}
+  & ~ \mathsf{minBalance} ~ (\mathit{utxo}, \mathit{pending}) \\
+= & ~ \mathsf{balance} ~ \mathit{utxo}
+    - \mathsf{balance} ~ (\mathsf{txins} ~ \mathit{pending} \restrictdom \mathit{utxo})
+    + \mathsf{balance} ~ (\mathsf{txouts} ~ \mathit{pending} \restrictrange \mathsf{TxOut}_\mathsf{ours}) \\
+= & ~ \mathsf{totalBalance} ~ (\mathit{utxo}, \mathit{pending})
+\end{align*}
+
+\begin{proof}[Proof (sketch)]
+Since the wallet's owner is not submitting any new transactions, transactions
+created by \emph{other} entities cannot transfer funds out of the wallet.
+Moreover, all of the pending transactions \emph{decrease} the
+wallet's balance, so the wallet's minimum balance will be reached when all
+of those pending transactions are included in the blockchain.
+\end{proof}
+
+\subsection{Dependent transactions}
+
+When we allow for dependent transactions, the situation is much the same as
+for the basic model, but we need to make sure that we don't add any ``change''
+outputs that are spent within $\mathit{pending}$.
+
+\subsection{Rollback}
+
+Rollback makes the situation more subtle. We have a set $\mathit{pending}$
+of transactions that the wallet's owner submitted, but have not yet been
+included in the blockchain, as well as a set $\mathit{expected}$ of transactions
+that transfer funds \emph{to} the wallet, but also have not yet been included
+in the blockchain.
+
+If these expected and pending transactions would all be independent, the
+minimum balance of the wallet would simply be given by assuming that none of
+the expected transactions get confirmed and all of the pending ones do.
+Unfortunately, there can (and will) be dependencies between these two sets
+in both directions.
+
+Observations:
+
+\begin{itemize}
+\item Consider a pending transaction $t$ (i.e., a transaction that decreases
+the wallet's balance). Provided that all of $t$'s dependencies are included,
+then we should \emph{always} include $t$: if nothing depends on $t$, then
+including $t$ will obviously decrease the wallet's balance; if there are
+other transactions that depend on $t$, then \emph{not} including $t$ will
+mean we get no choice in including those other transactions or not, but
+if we do include it, it doesn't force our hand either way for those
+other transactions.
+\end{itemize}
+
+
+
+
+\begin{figure}[p]
+
+\newcommand{\Y}[1]{#1}
+\newcommand{\N}[1]{\overline{#1}}
+
+\begin{tabular}{lll}
+%%%
+\multicolumn{3}{l}{\emph{Single independent tranasction}} \\
+\begin{forest}
+[$(t_1: c_1)$]
+\end{forest}
+&
+\begin{math}
+\Delta =
+\begin{cases}
+   0 & \overline{t_1} \\
+ c_1 & t_1
+\end{cases}
+\end{math}
+&
+include if $c_1 \le 0$
+\\
+%%%
+\\
+\multicolumn{3}{l}{\emph{One transaction dependent on one other}} \\
+\begin{forest}
+[$(t_1: c_1)$, baseline [$(t_2: c_2)$]]
+\end{forest}
+&
+\begin{math}
+\Delta =
+\begin{cases}
+0         & \N{t_1} \, \N{t_2} \\
+c_2       & \N{t_1} \, \Y{t_2} \\
+c_2 + c_1 & \Y{t_2} \, \Y{t_2}
+\end{cases}
+\end{math}
+&
+\begin{math}
+\begin{array}{ll|l}
+c_2 &                    & \text{pick}        \\ \hline
+< 0 &                    & \Y{t_1} \, \Y{t_2} \\
+> 0 & c_1 + c_2 \le 0    & \Y{t_1} \, \Y{t_2} \\
+    & \textit{otherwise} & \N{t_1} \, \N{t_2} \\
+\end{array}
+\end{math} \\
+&& $t_1$ never included if $c_1 > 0$ \\
+\\
+%%%
+\\
+\multicolumn{3}{l}{\emph{One transaction dependent on two others}} \\
+\begin{forest}
+[$(t_1: c_1)$ [$(t_2: c_2)$] [$(t_3: c_3)$]]
+\end{forest}
+&
+\begin{math}
+\Delta =
+\begin{cases}
+0               & \N{t_1} \, \N{t_2} \, \N{t_3} \\
+c_3             & \N{t_1} \, \N{t_2} \, \Y{t_3} \\
+c_2             & \N{t_1} \, \Y{t_2} \, \N{t_3} \\
+c_3 + c_2       & \N{t_1} \, \Y{t_2} \, \Y{t_3} \\
+c_3 + c_2 + c_1 & \Y{t_1} \, \Y{t_2} \, \Y{t_3}
+\end{cases}
+\end{math}
+&
+\begin{math}
+\begin{array}{lll|l}
+c_2 & c_3 &                         & \text{pick} \\ \hline
+< 0 & < 0 &                         & \Y{t_1} \, \Y{t_2} \, \Y{t_3} \\
+< 0 & > 0 & c_1 + c_3 \le 0         & \Y{t_1} \, \Y{t_2} \, \Y{t_3} \\
+    &     & \textit{otherwise}      & \N{t_1} \, \Y{t_2} \, \N{t_3} \\
+> 0 & < 0 & c_1 + c_2 \le 0         & \Y{t_1} \, \Y{t_2} \, \Y{t_3} \\
+    &     & \textit{otherwise}      & \N{t_1} \, \N{t_2} \, \Y{t_3} \\
+> 0 & > 0 & c_1 + (c_2 + c_3) \le 0 & \Y{t_1} \, \Y{t_2} \, \Y{t_3} \\
+    &     & \textit{otherwise}      & \N{t_1} \, \N{t_2} \, \N{t_3} \\
+\end{array}
+\end{math}
+\\
+&& (if $c_1 > 0$ reduces to two independent transactions.)
+\\
+%%%
+\\
+\multicolumn{3}{l}{\emph{Two transactions depending on a single other}} \\
+\begin{forest}
+  [,phantom
+  [$(t_1: c_1)$ [$(t_3: c_3)$, name=t3]]
+  [$(t_2: c_2)$] {\draw () to (t3);}
+  ]
+\end{forest}
+&
+\begin{math}
+\Delta =
+\begin{cases}
+0               & \N{t_1} \N{t_2} \N{t_3} \\
+c_3             & \N{t_1} \N{t_2} \Y{t_3} \\
+c_3 + c_2       & \N{t_1} \Y{t_2} \Y{t_3} \\
+c_3 + c_1       & \Y{t_1} \N{t_2} \Y{t_3} \\
+c_3 + c_2 + c_1 & \Y{t_1} \Y{t_2} \Y{t_3}
+\end{cases}
+\end{math}
+&
+\begin{math}
+\begin{array}{ll|l}
+c_3 &                         & \text{pick}             \\ \hline
+< 0 &                         & \Y{t_1} \Y{t_2} \Y{t_3} \\
+> 0 & (c_1 + c_2) + c_3 \le 0 & \Y{t_1} \Y{t_2} \Y{t_3} \\
+    & \textit{otherwise}      & \N{t_1} \N{t_2} \N{t_3} \\
+\end{array}
+\end{math} \\
+&& $t_1$ never included if $c_1 > 0$; similarly for $t_2$
+\\
+%%%
+\\
+\multicolumn{3}{l}{\emph{Common ancestor}} \\
+\begin{forest}
+[$(t_1: c_1)$
+  [$(t_2: c_2)$, baseline [$(t_4: c_4)$, name=t4]]
+  [$(t_3: c_3)$] {\draw () to (t4);}
+]
+\end{forest}
+&
+\begin{math}
+\Delta =
+\begin{cases}
+0                     & \N{t_1} \N{t_2} \N{t_3} \N{t_4} \\
+c_4                   & \N{t_1} \N{t_2} \N{t_3} \Y{t_4} \\
+c_4 + c_3             & \N{t_1} \N{t_2} \Y{t_3} \Y{t_4} \\
+c_4 + c_2             & \N{t_1} \Y{t_2} \N{t_3} \Y{t_4} \\
+c_4 + c_3 + c_2       & \N{t_1} \Y{t_2} \Y{t_3} \Y{t_4} \\
+c_4 + c_3 + c_2 + c_1 & \Y{t_1} \Y{t_2} \Y{t_3} \Y{t_4}
+\end{cases}
+\end{math}
+\end{tabular}
+
+
+
+
+
+
+
+\end{figure}
+
+\clearpage
+
 
 \section{TODO: History tracking}
 

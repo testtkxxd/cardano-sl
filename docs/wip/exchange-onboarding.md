@@ -235,6 +235,12 @@ The following command can be used to see the percentage completion of the sync o
     100
 
 ## Creating a New Wallet
+
+In the following examples, we will use curl to illustrate request to an API running on the default port 8090.
+
+Please note that wallet web API uses TLS for secure communication. Requests to the API need to send a client CA certificate that was used when launching the node and identifies the client as being permitted to invoke the server API.
+
+Creating a New Wallet
 You can create your first wallet using the POST /api/v1/wallets endpoint as follow:
 
     curl -X POST https://localhost:8090/api/v1/wallets                     \
@@ -250,7 +256,7 @@ You can create your first wallet using the POST /api/v1/wallets endpoint as foll
     }'
 Warning: Those 12 mnemonic words given for the backup phrase act as an example. Do not use them on a production system. See the section below about mnemonic codes for more information.
 
-As a response, the API provides you with a wallet id used in subsequent requests to uniquely identity the wallet. Make sure to store it / write it down. Note that every API response is jsend-compliant; Cardano also augments responses with meta-data specific to pagination. More details in the section below about Pagination.
+As a response, the API provides you with a unique wallet id to be used in subsequent requests. Make sure to store it / write it down. Note that every API response is jsend-compliant.
 
     {
         "status": "success",
@@ -268,15 +274,15 @@ As a response, the API provides you with a wallet id used in subsequent requests
             }
         }
     }
-You have just created your first wallet. Information about this wallet can be retrieved using the GET /api/v1/wallets/{walletId} endpoint as follow:
+You have just created your first wallet. Information about this wallet can be retrieved using the GET /api/v1/wallets/{walletId} endpoint as follows:
 
     curl -X GET https://localhost:8090/api/v1/wallets/{{walletId}} \
          -H "Accept: application/json; charset=utf-8"              \
-         --cacert ./scripts/tls-files/ca.crt                       \
+         --cacert ./scripts/tls-files/ca.crt
 
 ## Receiving Money
 
-To receive money from other users you should provide your address. This address can be obtained from an account. Each wallet contains at least one account, you can think of account as a pocket inside of your wallet. Besides, you can view all existing accounts of a wallet by using the GET /api/v1/wallets/{{walletId}}/accounts endpoint as follow:
+To receive Ada from other users you should provide your address. This address can be obtained from an account. Each wallet contains at least one account. An account is like a pocket inside your wallet. View all existing accounts of a wallet by using the GET /api/v1/wallets/{{walletId}}/accounts endpoint:
 
     curl -X GET https://localhost:8090/api/v1/wallets/{{walletId}}/accounts?page=1&per_page=10 \
          -H "Accept: application/json; charset=utf-8"                                          \
@@ -305,12 +311,11 @@ Since you have, for now, only a single wallet, you’ll see something like this:
             }
         }
     }
-
-Each account has at least one address, all listed under the addresses field. You can communicate one of these addresses to receive money on the associated account.
+All the wallet’s accounts are listed under the addresses field. You can communicate one of these addresses to receive Ada on the associated account.
 
 ## Sending Money
 
-In order to send money from one of your account to another address, you can create a new payment transaction using the POST /api/v1/transactions endpoint as follow:
+In order to send Ada from one of your accounts to another address, you must create a new payment transaction using the POST /api/v1/transactions endpoint:
 
     curl -X POST https://localhost:8090/api/v1/transactions \
          -H "Content-Type: application/json; charset=utf-8" \
@@ -326,16 +331,14 @@ In order to send money from one of your account to another address, you can crea
         "walletId": "Ae2tdPwUPE...8V3AVTnqGZ"               \
       }                                                     \
     }'
+Note that, in order to perform a transaction, you need to have enough coins on the source account! The Cardano API is designed to accomodate multiple recipients payments out-of-the-box; notice how destinations is a list of addresses (and corresponding amounts).
 
-Note that, in order to perform a transaction, you need to have some existing coins on the source account! Beside, the Cardano API is designed to accomodate multiple recipients payments out-of-the-box; notice how destinations is a list of addresses.
-
-When the transaction succeeds, funds are becomes unavailable from the sources addresses, and available to the destinations in a short delay. Note that, you can at any time see the status of your wallets by using the GET /api/v1/transactions/{{walletId}} endpoint as follow:
+When the transaction succeeds, funds are no longer available in the sources addresses, and are soon made available to the destinations. Note that, you can at any time see the status of your wallets by using the GET /api/v1/transactions/{{walletId}} endpoint:
 
     curl -X GET https://localhost:8090/api/v1/wallets/{{walletId}}?account_index=0  \
          -H "Accept: application/json; charset=utf-8"                               \
          --cacert ./scripts/tls-files/ca.crt                                        \
-
-We have here constrainted the request to a specific account, with our previous transaction the output should look roughly similar to this:
+Here we constrainted the request to a specific account. After our previous transaction the output should look roughly similar to this:
 
     {
         "status": "success",
@@ -365,6 +368,8 @@ We have here constrainted the request to a specific account, with our previous t
             }
         }
     }
+In addition, and because it is not possible to preview a transaction, one can lookup a transaction’s fees using the POST /api/v1/transactions/fees endpoint to get an estimation of those fees.
+
 
 ## Where can I find the API documentation?
 

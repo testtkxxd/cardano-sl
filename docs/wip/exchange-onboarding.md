@@ -28,6 +28,7 @@ Table of Contents
 
 * Exchanges must provide an email address, so IOHK can broadcast issue and update announcements.
 * IOHK will create a guest Slack room to support the exchange.
+* Exchanges must provide IOHK with a status page for their service/wallets.
 
 # Requirements
 

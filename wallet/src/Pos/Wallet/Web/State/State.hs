@@ -5,7 +5,7 @@
 module Pos.Wallet.Web.State.State
        ( WalletDB
        , WalletDbReader
-       , WalletTip (..)
+       , WalletSyncState (..)
        , PtxMetaUpdate (..)
        , AddressInfo (..)
        , askWalletDB
@@ -31,7 +31,7 @@ module Pos.Wallet.Web.State.State
        , getWalletMeta
        , getWalletMetaIncludeUnready
        , getWalletPassLU
-       , getWalletSyncTip
+       , getWalletSyncState
        , getWalletAddresses
        , doesWAddressExist
        , getTxMeta
@@ -104,7 +104,7 @@ import           Pos.Wallet.Web.State.Acidic as A
 import           Pos.Wallet.Web.State.Storage (AddressInfo (..), AddressLookupMode (..), CAddresses,
                                                CurrentAndRemoved (..), CustomAddressType (..),
                                                PtxMetaUpdate (..), WalletBalances, WalletStorage,
-                                               WalletTip (..))
+                                               WalletSyncState (..))
 import qualified Pos.Wallet.Web.State.Storage as S
 import           Universum
 
@@ -178,8 +178,10 @@ getWalletMetaIncludeUnready ws includeReady wid =
 getWalletPassLU :: WalletSnapshot -> CId Wal -> Maybe PassPhraseLU
 getWalletPassLU ws wid = queryValue ws (S.getWalletPassLU wid)
 
-getWalletSyncTip :: WalletSnapshot -> CId Wal -> Maybe WalletTip
-getWalletSyncTip ws wid = queryValue ws (S.getWalletSyncTip wid)
+-- TODO(adn):  Is it necessary to preserve 'getWalletSyncTip' in case it's
+-- present in some acid-state transaction log?
+getWalletSyncState :: WalletSnapshot -> CId Wal -> Maybe WalletSyncState
+getWalletSyncState ws wid = queryValue ws (S.getWalletSyncState wid)
 
 getAccountWAddresses
     :: WalletSnapshot -> AddressLookupMode -> AccountId -> Maybe [AddressInfo]
